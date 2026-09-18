@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AION2 聖域副本戰術排班系統 (多組別團隊管理版)</title>
+    <title>AION2 聖域副本戰術排班系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -39,33 +39,39 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b;
         }
-        /* 客製化三角形樣式 */
         .clip-triangle {
             clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
         }
-        /* 彈窗漸變動畫 */
-        .modal-animate {
-            animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-6 selection:bg-red-600 selection:text-white">
+<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-6 selection:bg-red-600 selection:text-white relative">
+
+    <!-- Toast 通知容器 -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- 通用彈窗 Modal -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all scale-95 opacity-0 duration-200" id="modal-card">
+            <h3 id="modal-title" class="text-lg font-bold text-slate-100 mb-2">提示</h3>
+            <p id="modal-body" class="text-xs md:text-sm text-slate-300 mb-4 leading-relaxed"></p>
+            <div id="modal-input-container" class="mb-4 hidden">
+                <input type="text" id="modal-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+            </div>
+            <div class="flex justify-end gap-3" id="modal-actions"></div>
+        </div>
+    </div>
 
     <!-- 頂部標題與模式切換頁籤 -->
     <header class="w-full max-w-5xl mx-auto text-center py-2 mb-2">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/80 border border-red-800 text-red-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-            AION2 副本戰術工具 (多隊組別支援版)
+            AION2 副本戰術工具 (多組別 & 網址分享)
         </div>
         <h1 class="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-red-400 via-rose-300 to-amber-300 bg-clip-text text-transparent">
             聖域：穆斯費爾戰術排班系統
         </h1>
         <p class="text-xs md:text-sm text-slate-400 mt-1 mb-4">
-            支援「聖杯 10 人披薩站位」與「8 人放射線/藍三角機制」多團隊自由切換與排班！
+            支援「聖杯 10 人」與「8 人放射線」多組別管理，可產生連結一鍵分享給隊友！
         </p>
 
         <!-- 頁籤切換按鈕 -->
@@ -84,56 +90,55 @@
     <!-- 模式 1：聖杯 10 人披薩排班 -->
     <main id="view-grail" class="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow">
         <section class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl backdrop-blur-md">
-            
-            <!-- 團隊/組別切換控制列 -->
-            <div class="mb-4 p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <label for="grail-team-select" class="text-xs font-bold text-red-400 flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                        目前團隊組別：
-                    </label>
-                    <span id="save-status-grail" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
-                </div>
-                <div class="flex gap-1.5">
-                    <select id="grail-team-select" onchange="onGrailTeamChange(this.value)" class="flex-grow bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500 font-semibold">
-                        <!-- 動態插入團隊選單 -->
-                    </select>
-                    <button onclick="addGrailTeamPrompt()" title="新增團隊" class="p-1.5 bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 rounded-lg transition active:scale-95 text-xs flex items-center gap-1 font-bold">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        新增
-                    </button>
-                    <button onclick="renameGrailTeamPrompt()" title="重命名目前組別" class="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg transition active:scale-95 text-xs">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                    </button>
-                    <button onclick="deleteGrailTeamConfirm()" title="刪除目前組別" class="p-1.5 bg-slate-800 hover:bg-rose-950/80 hover:border-rose-800 text-rose-400 rounded-lg transition active:scale-95 text-xs">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </div>
+            <!-- 標題與自動儲存提示 -->
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    聖杯 10 人站位排班名單
+                </h2>
+                <span id="save-status-grail" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
             </div>
 
-            <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-800">
-                <h2 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                    成員名單編排
-                </h2>
+            <!-- 組別切換控制區 -->
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="flex-grow">
+                    <select id="team-select-grail" onchange="changeTeam('grail', this.value)" class="w-full bg-slate-950 border border-red-900/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-300 focus:outline-none focus:border-red-500">
+                    </select>
+                </div>
+                <button onclick="promptAddTeam('grail')" title="新增組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition flex items-center gap-1">
+                    ➕ 新增
+                </button>
+                <button onclick="promptRenameTeam('grail')" title="重命名目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition">
+                    ✏️
+                </button>
+                <button onclick="promptDeleteTeam('grail')" title="刪除目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-rose-950 text-rose-300 text-xs rounded-xl border border-slate-700 hover:border-rose-800 transition">
+                    🗑️
+                </button>
             </div>
-            <div id="inputs-container-grail" class="space-y-2 max-h-[340px] overflow-y-auto pr-1"></div>
-            <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
-                <button onclick="randomizeGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm">
+
+            <div id="inputs-container-grail" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
+
+            <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800">
+                <button onclick="randomizeGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     隨機分組
                 </button>
-                <button onclick="clearGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm">
+                <button onclick="clearGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    清空成員
+                    清空本組
                 </button>
-                <button onclick="copyGrail()" class="px-3 py-2 bg-red-600 hover:bg-red-500 active:scale-95 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-red-900/30">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                    複製清單
+                <button onclick="copyGrailText()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    複製純文字
+                </button>
+                <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-red-900/40">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    🔗 產生分享連結
                 </button>
             </div>
         </section>
 
+        <!-- 右側視覺化圓盤 -->
         <section class="lg:col-span-7 flex flex-col items-center justify-center bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden min-h-[460px]">
             <div class="absolute inset-0 bg-radial from-red-950/30 via-transparent to-transparent pointer-events-none"></div>
             <div class="relative w-[360px] h-[360px] md:w-[400px] md:h-[400px] rounded-full flex items-center justify-center shadow-2xl border-4 border-red-950/80 bg-slate-950">
@@ -170,63 +175,59 @@
     <!-- 模式 2：8人放射線藍三角機制排班 -->
     <main id="view-radiant" class="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow hidden">
         <section class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl backdrop-blur-md">
-            
-            <!-- 團隊/組別切換控制列 -->
-            <div class="mb-4 p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <label for="radiant-team-select" class="text-xs font-bold text-sky-400 flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                        目前團隊組別：
-                    </label>
-                    <span id="save-status-radiant" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
-                </div>
-                <div class="flex gap-1.5">
-                    <select id="radiant-team-select" onchange="onRadiantTeamChange(this.value)" class="flex-grow bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-500 font-semibold">
-                        <!-- 動態插入團隊選單 -->
-                    </select>
-                    <button onclick="addRadiantTeamPrompt()" title="新增團隊" class="p-1.5 bg-sky-950/80 hover:bg-sky-900 border border-sky-800 text-sky-300 rounded-lg transition active:scale-95 text-xs flex items-center gap-1 font-bold">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        新增
-                    </button>
-                    <button onclick="renameRadiantTeamPrompt()" title="重命名目前組別" class="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg transition active:scale-95 text-xs">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                    </button>
-                    <button onclick="deleteRadiantTeamConfirm()" title="刪除目前組別" class="p-1.5 bg-slate-800 hover:bg-rose-950/80 hover:border-rose-800 text-rose-400 rounded-lg transition active:scale-95 text-xs">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </div>
+            <!-- 標題與自動儲存提示 -->
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                    8人放射線/藍三角機制排班
+                </h2>
+                <span id="save-status-radiant" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
             </div>
 
-            <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-800">
-                <h2 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
-                    成員名單編排
-                </h2>
+            <!-- 組別切換控制區 -->
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="flex-grow">
+                    <select id="team-select-radiant" onchange="changeTeam('radiant', this.value)" class="w-full bg-slate-950 border border-sky-900/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-sky-300 focus:outline-none focus:border-sky-500">
+                    </select>
+                </div>
+                <button onclick="promptAddTeam('radiant')" title="新增組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition flex items-center gap-1">
+                    ➕ 新增
+                </button>
+                <button onclick="promptRenameTeam('radiant')" title="重命名目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition">
+                    ✏️
+                </button>
+                <button onclick="promptDeleteTeam('radiant')" title="刪除目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-rose-950 text-rose-300 text-xs rounded-xl border border-slate-700 hover:border-rose-800 transition">
+                    🗑️
+                </button>
             </div>
-            <div id="inputs-container-radiant" class="space-y-2 max-h-[340px] overflow-y-auto pr-1"></div>
-            <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
-                <button onclick="randomizeRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm">
+
+            <div id="inputs-container-radiant" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
+
+            <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800">
+                <button onclick="randomizeRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     隨機分組
                 </button>
-                <button onclick="clearRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm">
+                <button onclick="clearRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    清空成員
+                    清空本組
                 </button>
-                <button onclick="copyRadiant()" class="px-3 py-2 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-sky-900/30">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                    複製清單
+                <button onclick="copyRadiantText()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    複製純文字
+                </button>
+                <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-sky-900/40">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    🔗 產生分享連結
                 </button>
             </div>
         </section>
 
+        <!-- 右側視覺化圓盤 -->
         <section class="lg:col-span-7 flex flex-col items-center justify-center bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden min-h-[460px]">
             <div class="absolute inset-0 bg-radial from-sky-950/25 via-transparent to-transparent pointer-events-none"></div>
             <div class="relative w-[360px] h-[360px] md:w-[400px] md:h-[400px] rounded-full flex items-center justify-center shadow-2xl border-4 border-slate-800 bg-slate-950">
-                
-                <!-- SVG 放射線與藍三角圖騰 -->
                 <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 400">
-                    <!-- 8 條放射線 -->
                     <line x1="200" y1="200" x2="200" y2="15" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
                     <line x1="200" y1="200" x2="200" y2="385" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
                     <line x1="200" y1="200" x2="15" y2="200" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
@@ -235,122 +236,104 @@
                     <line x1="200" y1="200" x2="69" y2="331" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
                     <line x1="200" y1="200" x2="69" y2="69" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
                     <line x1="200" y1="200" x2="331" y2="331" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
-
-                    <!-- 下方弧形安全區 (坦位裝飾弧度) -->
-                    <path d="M 120,335 A 100,100 0 0,0 280,335" fill="none" stroke="#ef4444" stroke-width="5" stroke-linecap="round" opacity="0.75" />
                 </svg>
 
-                <!-- 中央 BOSS 圓心 -->
                 <div class="absolute w-24 h-24 rounded-full bg-gradient-to-br from-red-600 to-red-950 border-2 border-red-500 shadow-xl flex flex-col items-center justify-center z-10 pointer-events-none">
                     <span class="text-xs font-bold text-red-100 tracking-wider">BOSS</span>
                     <span class="text-[9px] text-red-300 font-medium">核心區</span>
                 </div>
 
-                <!-- 下方弧形坦位標籤卡片 -->
-                <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-red-950/90 border border-red-600/80 px-3 py-1 rounded-xl shadow-xl text-center z-20 pointer-events-auto min-w-[90px]">
-                    <div class="text-[9px] font-bold text-red-300">🛡️ 安全弧區</div>
-                    <div id="arc-label-display" class="text-xs font-bold text-slate-100 truncate max-w-[100px]">坦位</div>
-                </div>
-
-                <!-- 放射線數字編號 (1-8) 與藍三角標記容器 -->
                 <div id="radiant-slots-container" class="absolute inset-0 pointer-events-none"></div>
-
             </div>
             <div class="mt-3 text-xs text-slate-400 text-center">
-                包含 1~8 放射線外圈編號、8個藍三角裝飾位以及下方紅色弧形安全坦位！
+                包含 1~8 放射線外圈編號、8個藍三角裝飾位以及下方弧形坦位！
             </div>
         </section>
     </main>
-
-    <!-- 通用自訂彈窗 Dialog (替代 native alert/confirm) -->
-    <div id="custom-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-2xl modal-animate flex flex-col gap-4">
-            <div id="modal-header" class="text-base font-bold text-slate-100">提示</div>
-            <div id="modal-body" class="text-xs text-slate-300">內容訊息</div>
-            <div id="modal-input-wrapper" class="hidden">
-                <input type="text" id="modal-input" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-red-500" placeholder="請輸入...">
-            </div>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button id="modal-cancel-btn" onclick="closeModal()" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition">取消</button>
-                <button id="modal-confirm-btn" class="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition">確定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 通用 Toast 浮動通知 -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-slate-700 text-slate-100 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold z-50 transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none">
-        <span id="toast-icon">✨</span>
-        <span id="toast-msg">訊息說明</span>
-    </div>
 
     <footer class="w-full max-w-5xl mx-auto text-center py-4 mt-2 text-xs text-slate-500 border-t border-slate-900">
         AION2 Sanctuary Strategy Tool &copy; 2026. All rights reserved.
     </footer>
 
     <script>
-        // --- 彈窗 & Toast 系統 (代換 alert / confirm) ---
-        function showToast(msg, icon = '✨') {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            document.getElementById('toast-icon').innerText = icon;
-            toast.classList.remove('translate-y-10', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
+        // --- 通用 UI 元件 (Toast 與 Modal) ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-950/90 border-emerald-700 text-emerald-200' : 'bg-rose-950/90 border-rose-700 text-rose-200';
+            toast.className = `px-4 py-2.5 rounded-xl border shadow-xl text-xs font-semibold backdrop-blur-md transition-all transform translate-y-2 opacity-0 flex items-center gap-2 ${bgClass}`;
+            toast.innerHTML = message;
+            container.appendChild(toast);
+
             setTimeout(() => {
-                toast.classList.add('translate-y-10', 'opacity-0');
-                toast.classList.remove('translate-y-0', 'opacity-100');
-            }, 2500);
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-8px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
-        function closeModal() {
-            document.getElementById('custom-modal').classList.add('hidden');
-        }
-
-        function showPromptModal(title, defaultVal, placeholder, onConfirm) {
-            const modal = document.getElementById('custom-modal');
-            document.getElementById('modal-header').innerText = title;
-            document.getElementById('modal-body').innerText = '請輸入新區塊/組別名稱：';
-            const inputWrapper = document.getElementById('modal-input-wrapper');
+        function showCustomModal({ title, body, hasInput = false, inputValue = '', onConfirm, confirmText = '確定', cancelText = '取消' }) {
+            const overlay = document.getElementById('modal-overlay');
+            const card = document.getElementById('modal-card');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const inputContainer = document.getElementById('modal-input-container');
             const input = document.getElementById('modal-input');
-            inputWrapper.classList.remove('hidden');
-            input.value = defaultVal || '';
-            input.placeholder = placeholder || '';
-            
-            const cancelBtn = document.getElementById('modal-cancel-btn');
-            cancelBtn.classList.remove('hidden');
+            const actions = document.getElementById('modal-actions');
 
-            const confirmBtn = document.getElementById('modal-confirm-btn');
+            modalTitle.innerText = title;
+            modalBody.innerHTML = body;
+
+            if (hasInput) {
+                inputContainer.classList.remove('hidden');
+                input.value = inputValue;
+                setTimeout(() => input.focus(), 100);
+            } else {
+                inputContainer.classList.add('hidden');
+            }
+
+            actions.innerHTML = '';
+            if (cancelText) {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition';
+                cancelBtn.innerText = cancelText;
+                cancelBtn.onclick = closeModal;
+                actions.appendChild(cancelBtn);
+            }
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl transition shadow-lg shadow-red-900/30';
+            confirmBtn.innerText = confirmText;
             confirmBtn.onclick = () => {
-                const val = input.value.trim();
-                if (val) {
-                    onConfirm(val);
+                const val = hasInput ? input.value : true;
+                if (onConfirm(val) !== false) {
                     closeModal();
                 }
             };
+            actions.appendChild(confirmBtn);
 
-            modal.classList.remove('hidden');
-            setTimeout(() => input.focus(), 100);
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                card.classList.remove('scale-95', 'opacity-0');
+            }, 10);
         }
 
-        function showConfirmModal(title, msg, onConfirm) {
-            const modal = document.getElementById('custom-modal');
-            document.getElementById('modal-header').innerText = title;
-            document.getElementById('modal-body').innerText = msg;
-            document.getElementById('modal-input-wrapper').classList.add('hidden');
-            
-            const cancelBtn = document.getElementById('modal-cancel-btn');
-            cancelBtn.classList.remove('hidden');
-
-            const confirmBtn = document.getElementById('modal-confirm-btn');
-            confirmBtn.onclick = () => {
-                onConfirm();
-                closeModal();
-            };
-
-            modal.classList.remove('hidden');
+        function closeModal() {
+            const overlay = document.getElementById('modal-overlay');
+            const card = document.getElementById('modal-card');
+            card.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 200);
         }
 
         // --- 頁籤切換邏輯 ---
+        let currentTab = 'grail';
         function switchTab(tab) {
+            currentTab = tab;
             const btnGrail = document.getElementById('tab-btn-grail');
             const btnRadiant = document.getElementById('tab-btn-radiant');
             const viewGrail = document.getElementById('view-grail');
@@ -369,7 +352,7 @@
             }
         }
 
-        // --- 模式 1：聖杯 10 人邏輯 與 多團隊資料管理 ---
+        // --- 資料設定檔與預設資料 ---
         const slotConfigsGrail = [
             { id: '1', type: 'pizza', label: '1 號位', angle: 22.5,  defaultName: "隊員 1" },
             { id: '2', type: 'pizza', label: '2 號位', angle: 67.5,  defaultName: "隊員 2" },
@@ -379,125 +362,177 @@
             { id: '6', type: 'pizza', label: '6 號位', angle: 247.5, defaultName: "隊員 6" },
             { id: '7', type: 'pizza', label: '7 號位', angle: 292.5, defaultName: "隊員 7" },
             { id: '8', type: 'pizza', label: '8 號位', angle: 337.5, defaultName: "隊員 8" },
-            { id: 'star', type: 'special', label: '★ 星星位', angle: 270, defaultName: "星星隊員" },
-            { id: 'moon', type: 'special', label: '🌙 月亮位', angle: 90,  defaultName: "月亮隊員" }
+            { id: 'star', type: 'special', label: '★ 星星位', angle: 270, defaultName: "星星位隊員" },
+            { id: 'moon', type: 'special', label: '🌙 月亮位', angle: 90,  defaultName: "月亮位隊員" }
         ];
 
-        function createDefaultGrailSlots() {
-            const slots = {};
-            slotConfigsGrail.forEach(s => slots[s.id] = s.defaultName);
-            return slots;
-        }
+        const slotConfigsRadiant = [
+            { id: 'r1', label: '1 號放射線', defaultName: "1號隊員", angle: 0, type: 'rad' },
+            { id: 'r2', label: '2 號放射線', defaultName: "2號隊員", angle: 45, type: 'rad' },
+            { id: 'r3', label: '3 號放射線', defaultName: "3號隊員", angle: 90, type: 'rad' },
+            { id: 'r4', label: '4 號放射線', defaultName: "4號隊員", angle: 135, type: 'rad' },
+            { id: 'r5', label: '5 號放射線', defaultName: "5號隊員", angle: 180, type: 'rad' },
+            { id: 'r6', label: '6 號放射線', defaultName: "6號隊員", angle: 225, type: 'rad' },
+            { id: 'r7', label: '7 號放射線', defaultName: "7號隊員", angle: 270, type: 'rad' },
+            { id: 'r8', label: '8 號放射線', defaultName: "8號隊員", angle: 315, type: 'rad' },
+        ];
 
-        function getStoredGrailData() {
-            const saved = localStorage.getItem('aion2_grail_teams_v4');
-            if (saved) {
-                try { return JSON.parse(saved); } catch(e){}
-            }
+        // 預設預設組別結構
+        function createDefaultStore(mode) {
+            const slots = mode === 'grail' ? slotConfigsGrail : slotConfigsRadiant;
+            const initSlots = {};
+            slots.forEach(s => initSlots[s.id] = s.defaultName);
             return {
-                activeId: 'g_team_1',
+                activeTeamId: 't_1',
                 teams: [
-                    { id: 'g_team_1', name: '聖杯一隊 (主力)', slots: createDefaultGrailSlots() },
-                    { id: 'g_team_2', name: '聖杯二隊 (分會)', slots: createDefaultGrailSlots() }
+                    { id: 't_1', name: '團隊一 (主力隊)', slots: { ...initSlots } },
+                    { id: 't_2', name: '團隊二 (二分隊)', slots: { ...initSlots } }
                 ]
             };
         }
 
-        let grailData = getStoredGrailData();
+        // --- LocalStorage 讀取與儲存 ---
+        function loadStore(mode) {
+            const key = mode === 'grail' ? 'aion2_grail_teams_v2' : 'aion2_radiant_teams_v2';
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                try { return JSON.parse(saved); } catch(e){}
+            }
+            return createDefaultStore(mode);
+        }
 
-        function getCurrentGrailTeam() {
-            let team = grailData.teams.find(t => t.id === grailData.activeId);
-            if (!team && grailData.teams.length > 0) {
-                team = grailData.teams[0];
-                grailData.activeId = team.id;
+        function saveStore(mode) {
+            const key = mode === 'grail' ? 'aion2_grail_teams_v2' : 'aion2_radiant_teams_v2';
+            const data = mode === 'grail' ? grailStore : radiantStore;
+            localStorage.setItem(key, JSON.stringify(data));
+            const ind = document.getElementById(`save-status-${mode}`);
+            if (ind) {
+                ind.style.opacity = '1';
+                setTimeout(() => ind.style.opacity = '0', 1000);
+            }
+        }
+
+        let grailStore = loadStore('grail');
+        let radiantStore = loadStore('radiant');
+
+        // 取得當前作用中的團隊物件
+        function getActiveTeam(mode) {
+            const store = mode === 'grail' ? grailStore : radiantStore;
+            let team = store.teams.find(t => t.id === store.activeTeamId);
+            if (!team && store.teams.length > 0) {
+                team = store.teams[0];
+                store.activeTeamId = team.id;
             }
             return team;
         }
 
-        function saveGrailStorage() {
-            localStorage.setItem('aion2_grail_teams_v4', JSON.stringify(grailData));
-            const ind = document.getElementById('save-status-grail');
-            ind.style.opacity = '1';
-            setTimeout(() => ind.style.opacity = '0', 1200);
-        }
-
-        function renderGrailTeamSelect() {
-            const select = document.getElementById('grail-team-select');
+        // --- 組別選單與管理邏輯 ---
+        function renderTeamOptions(mode) {
+            const store = mode === 'grail' ? grailStore : radiantStore;
+            const select = document.getElementById(`team-select-${mode}`);
             select.innerHTML = '';
-            grailData.teams.forEach(team => {
+            store.teams.forEach(t => {
                 const opt = document.createElement('option');
-                opt.value = team.id;
-                opt.textContent = team.name;
-                if (team.id === grailData.activeId) opt.selected = true;
+                opt.value = t.id;
+                opt.innerText = t.name;
+                if (t.id === store.activeTeamId) opt.selected = true;
                 select.appendChild(opt);
             });
         }
 
-        function onGrailTeamChange(teamId) {
-            grailData.activeId = teamId;
-            saveGrailStorage();
-            renderGrailInputs();
-            renderGrailVisual();
-            showToast(`已切換至「${getCurrentGrailTeam().name}」`);
-        }
-
-        function addGrailTeamPrompt() {
-            showPromptModal('新增聖杯團隊組別', `聖杯 ${grailData.teams.length + 1} 隊`, '輸入組別名稱...', (name) => {
-                const newId = 'g_team_' + Date.now();
-                grailData.teams.push({
-                    id: newId,
-                    name: name,
-                    slots: createDefaultGrailSlots()
-                });
-                grailData.activeId = newId;
-                saveGrailStorage();
-                renderGrailTeamSelect();
+        function changeTeam(mode, teamId) {
+            const store = mode === 'grail' ? grailStore : radiantStore;
+            store.activeTeamId = teamId;
+            saveStore(mode);
+            if (mode === 'grail') {
                 renderGrailInputs();
                 renderGrailVisual();
-                showToast(`已建立新團隊「${name}」`);
+            } else {
+                renderRadiantInputs();
+                renderRadiantVisual();
+            }
+        }
+
+        function promptAddTeam(mode) {
+            showCustomModal({
+                title: '新增組別',
+                body: '請輸入新組別名稱（例如：晚安打卡隊、二隊）：',
+                hasInput: true,
+                inputValue: `新團隊 ${Date.now().toString().slice(-3)}`,
+                onConfirm: (name) => {
+                    if (!name.trim()) return false;
+                    const store = mode === 'grail' ? grailStore : radiantStore;
+                    const slotsConfig = mode === 'grail' ? slotConfigsGrail : slotConfigsRadiant;
+                    const initSlots = {};
+                    slotsConfig.forEach(s => initSlots[s.id] = s.defaultName);
+
+                    const newTeam = {
+                        id: 't_' + Date.now(),
+                        name: name.trim(),
+                        slots: initSlots
+                    };
+                    store.teams.push(newTeam);
+                    store.activeTeamId = newTeam.id;
+                    saveStore(mode);
+                    renderTeamOptions(mode);
+                    if (mode === 'grail') { renderGrailInputs(); renderGrailVisual(); }
+                    else { renderRadiantInputs(); renderRadiantVisual(); }
+                    showToast(`已新增組別：「${newTeam.name}」`);
+                }
             });
         }
 
-        function renameGrailTeamPrompt() {
-            const team = getCurrentGrailTeam();
-            if (!team) return;
-            showPromptModal('重命名團隊組別', team.name, '輸入新組別名稱...', (newName) => {
-                team.name = newName;
-                saveGrailStorage();
-                renderGrailTeamSelect();
-                showToast(`已成功更名為「${newName}」`);
+        function promptRenameTeam(mode) {
+            const team = getActiveTeam(mode);
+            showCustomModal({
+                title: '重命名組別',
+                body: '請輸入新的組別名稱：',
+                hasInput: true,
+                inputValue: team.name,
+                onConfirm: (newName) => {
+                    if (!newName.trim()) return false;
+                    team.name = newName.trim();
+                    saveStore(mode);
+                    renderTeamOptions(mode);
+                    showToast(`已更新名稱為：「${team.name}」`);
+                }
             });
         }
 
-        function deleteGrailTeamConfirm() {
-            if (grailData.teams.length <= 1) {
-                showToast('至少需要保留一個團隊組別！', '⚠️');
+        function promptDeleteTeam(mode) {
+            const store = mode === 'grail' ? grailStore : radiantStore;
+            if (store.teams.length <= 1) {
+                showCustomModal({ title: '無法刪除', body: '至少必須保留一個團隊組別！', cancelText: '' });
                 return;
             }
-            const team = getCurrentGrailTeam();
-            showConfirmModal('刪除團隊組別', `確定要刪除「${team.name}」嗎？此動作無法復原。`, () => {
-                grailData.teams = grailData.teams.filter(t => t.id !== team.id);
-                grailData.activeId = grailData.teams[0].id;
-                saveGrailStorage();
-                renderGrailTeamSelect();
-                renderGrailInputs();
-                renderGrailVisual();
-                showToast(`已刪除「${team.name}」`);
+            const team = getActiveTeam(mode);
+            showCustomModal({
+                title: '刪除組別確認',
+                body: `確定要刪除「<b>${team.name}</b>」嗎？此操作無法復原。`,
+                onConfirm: () => {
+                    store.teams = store.teams.filter(t => t.id !== team.id);
+                    store.activeTeamId = store.teams[0].id;
+                    saveStore(mode);
+                    renderTeamOptions(mode);
+                    if (mode === 'grail') { renderGrailInputs(); renderGrailVisual(); }
+                    else { renderRadiantInputs(); renderRadiantVisual(); }
+                    showToast('已成功刪除組別！');
+                }
             });
         }
 
+        // --- 模式 1：聖杯 10 人邏輯 ---
         function renderGrailInputs() {
             const container = document.getElementById('inputs-container-grail');
             container.innerHTML = '';
-            const currentTeam = getCurrentGrailTeam();
-            if (!currentTeam) return;
+            const team = getActiveTeam('grail');
 
             slotConfigsGrail.forEach(cfg => {
-                const name = currentTeam.slots[cfg.id] || '';
+                const name = team.slots[cfg.id] || '';
                 const isSpecial = cfg.type === 'special';
                 const div = document.createElement('div');
                 div.className = `flex items-center gap-3 p-2 rounded-xl border transition ${isSpecial ? 'bg-slate-900/90 border-slate-700/80' : 'bg-slate-950/60 border-slate-800/80'}`;
-                
+
                 let badge = `<div class="w-7 h-7 rounded-lg bg-red-950/80 border border-red-800 flex items-center justify-center text-red-300 font-bold text-xs shrink-0">${cfg.id}</div>`;
                 if (cfg.id === 'star') badge = `<div class="w-7 h-7 rounded-lg bg-amber-950/90 border border-amber-600 flex items-center justify-center text-amber-300 font-bold text-sm shrink-0">★</div>`;
                 if (cfg.id === 'moon') badge = `<div class="w-7 h-7 rounded-lg bg-sky-950/90 border border-sky-600 flex items-center justify-center text-sky-300 font-bold text-sm shrink-0">🌙</div>`;
@@ -515,9 +550,9 @@
 
             document.querySelectorAll('.grail-input').forEach(input => {
                 input.addEventListener('input', (e) => {
-                    const slotId = e.target.getAttribute('data-id');
-                    getCurrentGrailTeam().slots[slotId] = e.target.value;
-                    saveGrailStorage();
+                    const id = e.target.getAttribute('data-id');
+                    team.slots[id] = e.target.value;
+                    saveStore('grail');
                     renderGrailVisual();
                 });
             });
@@ -526,11 +561,10 @@
         function renderGrailVisual() {
             const container = document.getElementById('pizza-slots-container');
             container.innerHTML = '';
-            const currentTeam = getCurrentGrailTeam();
-            if (!currentTeam) return;
+            const team = getActiveTeam('grail');
 
             slotConfigsGrail.forEach(cfg => {
-                const name = currentTeam.slots[cfg.id] || '';
+                const name = team.slots[cfg.id] || '';
                 let radius = 122;
                 if (cfg.type === 'special') radius = 84;
                 const rad = (cfg.angle - 90) * (Math.PI / 180);
@@ -565,176 +599,53 @@
         }
 
         function randomizeGrail() {
-            const team = getCurrentGrailTeam();
-            if (!team) return;
+            const team = getActiveTeam('grail');
             let list = slotConfigsGrail.map(s => team.slots[s.id] && team.slots[s.id].trim() !== '' ? team.slots[s.id].trim() : s.defaultName);
             for (let i = list.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [list[i], list[j]] = [list[j], list[i]];
             }
             slotConfigsGrail.forEach((s, idx) => team.slots[s.id] = list[idx]);
-            saveGrailStorage();
+            saveStore('grail');
             renderGrailInputs();
             renderGrailVisual();
-            showToast('已完成隨機分組！', '🎲');
+            showToast('已完成隨機亂序分組！');
         }
 
         function clearGrail() {
-            showConfirmModal('清空成員', '確定要清空聖杯 10 人排班名單嗎？', () => {
-                const team = getCurrentGrailTeam();
-                if (team) {
+            showCustomModal({
+                title: '清空本組名單',
+                body: '確定要清空目前組別的所有內容嗎？',
+                onConfirm: () => {
+                    const team = getActiveTeam('grail');
                     slotConfigsGrail.forEach(s => team.slots[s.id] = '');
-                    saveGrailStorage();
+                    saveStore('grail');
                     renderGrailInputs();
                     renderGrailVisual();
-                    showToast('已清空成員名單', '🧹');
+                    showToast('已清空名單');
                 }
             });
         }
 
-        function copyGrail() {
-            const team = getCurrentGrailTeam();
-            if (!team) return;
-            let text = `【 AION2 聖域聖杯 - ${team.name} 10人站位排班表 】\n`;
+        function copyGrailText() {
+            const team = getActiveTeam('grail');
+            let text = `【 AION2 聖域聖杯 - ${team.name} 排班表 】\n`;
             slotConfigsGrail.forEach(s => text += `${s.label}：${team.slots[s.id] || '(空白)'}\n`);
-            
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            showToast('已成功複製聖杯排班清單至剪貼簿！', '📋');
+            copyToClipboard(text);
+            showToast('已成功複製聖杯純文字排班表！');
         }
 
-
-        // --- 模式 2：8人放射線藍三角機制邏輯 與 多團隊資料管理 ---
-        const slotConfigsRadiant = [
-            { id: 'r1', label: '1 號放射線', defaultName: "1號隊員", angle: 0, type: 'rad' },
-            { id: 'r2', label: '2 號放射線', defaultName: "2號隊員", angle: 45, type: 'rad' },
-            { id: 'r3', label: '3 號放射線', defaultName: "3號隊員", angle: 90, type: 'rad' },
-            { id: 'r4', label: '4 號放射線', defaultName: "4號隊員", angle: 135, type: 'rad' },
-            { id: 'r5', label: '5 號放射線', defaultName: "5號隊員", angle: 180, type: 'rad' },
-            { id: 'r6', label: '6 號放射線', defaultName: "6號隊員", angle: 225, type: 'rad' },
-            { id: 'r7', label: '7 號放射線', defaultName: "7號隊員", angle: 270, type: 'rad' },
-            { id: 'r8', label: '8 號放射線', defaultName: "8號隊員", angle: 315, type: 'rad' },
-            { id: 'tank', label: '下方弧形區 (坦位)', defaultName: "坦位/主坦", type: 'tank' }
-        ];
-
-        function createDefaultRadiantSlots() {
-            const slots = {};
-            slotConfigsRadiant.forEach(s => slots[s.id] = s.defaultName);
-            return slots;
-        }
-
-        function getStoredRadiantData() {
-            const saved = localStorage.getItem('aion2_radiant_teams_v2');
-            if (saved) {
-                try { return JSON.parse(saved); } catch(e){}
-            }
-            return {
-                activeId: 'r_team_1',
-                teams: [
-                    { id: 'r_team_1', name: '放射一隊 (主力)', slots: createDefaultRadiantSlots() },
-                    { id: 'r_team_2', name: '放射二隊 (分會)', slots: createDefaultRadiantSlots() }
-                ]
-            };
-        }
-
-        let radiantData = getStoredRadiantData();
-
-        function getCurrentRadiantTeam() {
-            let team = radiantData.teams.find(t => t.id === radiantData.activeId);
-            if (!team && radiantData.teams.length > 0) {
-                team = radiantData.teams[0];
-                radiantData.activeId = team.id;
-            }
-            return team;
-        }
-
-        function saveRadiantStorage() {
-            localStorage.setItem('aion2_radiant_teams_v2', JSON.stringify(radiantData));
-            const ind = document.getElementById('save-status-radiant');
-            ind.style.opacity = '1';
-            setTimeout(() => ind.style.opacity = '0', 1200);
-        }
-
-        function renderRadiantTeamSelect() {
-            const select = document.getElementById('radiant-team-select');
-            select.innerHTML = '';
-            radiantData.teams.forEach(team => {
-                const opt = document.createElement('option');
-                opt.value = team.id;
-                opt.textContent = team.name;
-                if (team.id === radiantData.activeId) opt.selected = true;
-                select.appendChild(opt);
-            });
-        }
-
-        function onRadiantTeamChange(teamId) {
-            radiantData.activeId = teamId;
-            saveRadiantStorage();
-            renderRadiantInputs();
-            renderRadiantVisual();
-            showToast(`已切換至「${getCurrentRadiantTeam().name}」`);
-        }
-
-        function addRadiantTeamPrompt() {
-            showPromptModal('新增放射線團隊組別', `放射 ${radiantData.teams.length + 1} 隊`, '輸入組別名稱...', (name) => {
-                const newId = 'r_team_' + Date.now();
-                radiantData.teams.push({
-                    id: newId,
-                    name: name,
-                    slots: createDefaultRadiantSlots()
-                });
-                radiantData.activeId = newId;
-                saveRadiantStorage();
-                renderRadiantTeamSelect();
-                renderRadiantInputs();
-                renderRadiantVisual();
-                showToast(`已建立新團隊「${name}」`);
-            });
-        }
-
-        function renameRadiantTeamPrompt() {
-            const team = getCurrentRadiantTeam();
-            if (!team) return;
-            showPromptModal('重命名團隊組別', team.name, '輸入新組別名稱...', (newName) => {
-                team.name = newName;
-                saveRadiantStorage();
-                renderRadiantTeamSelect();
-                showToast(`已成功更名為「${newName}」`);
-            });
-        }
-
-        function deleteRadiantTeamConfirm() {
-            if (radiantData.teams.length <= 1) {
-                showToast('至少需要保留一個團隊組別！', '⚠️');
-                return;
-            }
-            const team = getCurrentRadiantTeam();
-            showConfirmModal('刪除團隊組別', `確定要刪除「${team.name}」嗎？此動作無法復原。`, () => {
-                radiantData.teams = radiantData.teams.filter(t => t.id !== team.id);
-                radiantData.activeId = radiantData.teams[0].id;
-                saveRadiantStorage();
-                renderRadiantTeamSelect();
-                renderRadiantInputs();
-                renderRadiantVisual();
-                showToast(`已刪除「${team.name}」`);
-            });
-        }
-
+        // --- 模式 2：8人放射線藍三角機制邏輯 ---
         function renderRadiantInputs() {
             const container = document.getElementById('inputs-container-radiant');
             container.innerHTML = '';
-            const currentTeam = getCurrentRadiantTeam();
-            if (!currentTeam) return;
+            const team = getActiveTeam('radiant');
 
             slotConfigsRadiant.forEach(cfg => {
-                const name = currentTeam.slots[cfg.id] || '';
+                const name = team.slots[cfg.id] || '';
                 const div = document.createElement('div');
                 div.className = `flex items-center gap-3 p-2 rounded-xl border transition ${cfg.type === 'tank' ? 'bg-red-950/40 border-red-800/80' : 'bg-slate-950/60 border-slate-800/80'}`;
-                
+
                 let badge = `<div class="w-7 h-7 rounded-lg bg-sky-950/80 border border-sky-800 flex items-center justify-center text-sky-300 font-bold text-xs shrink-0">${cfg.id.replace('r','')}</div>`;
                 if (cfg.type === 'tank') {
                     badge = `<div class="w-7 h-7 rounded-lg bg-red-900 border border-red-600 flex items-center justify-center text-white font-bold text-xs shrink-0">坦</div>`;
@@ -753,9 +664,9 @@
 
             document.querySelectorAll('.radiant-input').forEach(input => {
                 input.addEventListener('input', (e) => {
-                    const slotId = e.target.getAttribute('data-id');
-                    getCurrentRadiantTeam().slots[slotId] = e.target.value;
-                    saveRadiantStorage();
+                    const id = e.target.getAttribute('data-id');
+                    team.slots[id] = e.target.value;
+                    saveStore('radiant');
                     renderRadiantVisual();
                 });
             });
@@ -764,12 +675,11 @@
         function renderRadiantVisual() {
             const container = document.getElementById('radiant-slots-container');
             container.innerHTML = '';
-            const currentTeam = getCurrentRadiantTeam();
-            if (!currentTeam) return;
+            const team = getActiveTeam('radiant');
 
-            // 渲染 8 個放射線編號標籤與藍三角
+            // 渲染 8 個放射線位置
             slotConfigsRadiant.filter(s => s.type === 'rad').forEach(cfg => {
-                const name = currentTeam.slots[cfg.id] || '';
+                const name = team.slots[cfg.id] || '';
                 const radius = 135;
                 const rad = (cfg.angle - 90) * (Math.PI / 180);
                 const x = 200 + radius * Math.cos(rad);
@@ -788,7 +698,7 @@
                 `;
                 container.appendChild(badge);
 
-                // 藍色三角形點
+                // 藍色三角形點位
                 const triRadius = 75;
                 const triX = 200 + triRadius * Math.cos(rad);
                 const triY = 200 + triRadius * Math.sin(rad);
@@ -800,17 +710,17 @@
                 container.appendChild(triBadge);
             });
 
-            // 更新下方弧形坦位顯示卡片
-            const tankName = currentTeam.slots['tank'] || '';
-            const arcDisplay = document.getElementById('arc-label-display');
-            if (arcDisplay) {
-                arcDisplay.innerText = tankName || '坦位';
-            }
+            // 下方坦位弧形區
+            const tankName = team.slots['tank'] || '';
+            const tankBadge = document.createElement('div');
+            tankBadge.className = "absolute pointer-events-auto transform -translate-x-1/2 transition-all duration-200 z-20";
+            tankBadge.style.left = `50%`;
+            tankBadge.style.bottom = `18px`;
+            container.appendChild(tankBadge);
         }
 
         function randomizeRadiant() {
-            const team = getCurrentRadiantTeam();
-            if (!team) return;
+            const team = getActiveTeam('radiant');
             let radSlots = slotConfigsRadiant.filter(s => s.type === 'rad');
             let list = radSlots.map(s => team.slots[s.id] && team.slots[s.id].trim() !== '' ? team.slots[s.id].trim() : s.defaultName);
             for (let i = list.length - 1; i > 0; i--) {
@@ -818,49 +728,131 @@
                 [list[i], list[j]] = [list[j], list[i]];
             }
             radSlots.forEach((s, idx) => team.slots[s.id] = list[idx]);
-            saveRadiantStorage();
+            saveStore('radiant');
             renderRadiantInputs();
             renderRadiantVisual();
-            showToast('已完成隨機分組！', '🎲');
+            showToast('已完成隨機亂序分組！');
         }
 
         function clearRadiant() {
-            showConfirmModal('清空成員', '確定要清空 8 人放射線排班名單嗎？', () => {
-                const team = getCurrentRadiantTeam();
-                if (team) {
+            showCustomModal({
+                title: '清空本組名單',
+                body: '確定要清空目前組別的所有內容嗎？',
+                onConfirm: () => {
+                    const team = getActiveTeam('radiant');
                     slotConfigsRadiant.forEach(s => team.slots[s.id] = '');
-                    saveRadiantStorage();
+                    saveStore('radiant');
                     renderRadiantInputs();
                     renderRadiantVisual();
-                    showToast('已清空成員名單', '🧹');
+                    showToast('已清空名單');
                 }
             });
         }
 
-        function copyRadiant() {
-            const team = getCurrentRadiantTeam();
-            if (!team) return;
-            let text = `【 AION2 聖域 - ${team.name} 8人放射線/藍三角機制排班表 】\n`;
+        function copyRadiantText() {
+            const team = getActiveTeam('radiant');
+            let text = `【 AION2 聖域 - ${team.name} 8人放射線排班表 】\n`;
             slotConfigsRadiant.forEach(s => text += `${s.label}：${team.slots[s.id] || '(空白)'}\n`);
-            
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            showToast('已成功複製放射線排班清單至剪貼簿！', '📋');
+            copyToClipboard(text);
+            showToast('已成功複製 8 人放射線純文字排班表！');
         }
 
-        // 頁面載入初始化
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        // --- 🔗 產生分享連結功能 (URL Encoding / Decoding) ---
+        function generateShareLink() {
+            try {
+                const payload = {
+                    v: 2,
+                    tab: currentTab,
+                    grail: grailStore,
+                    radiant: radiantStore
+                };
+                const jsonString = JSON.stringify(payload);
+                // URL-safe Base64 編碼，支援 UTF-8 中文字元
+                const encoded = btoa(encodeURIComponent(jsonString))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/, '');
+
+                const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+                copyToClipboard(shareUrl);
+                showToast('🔗 已成功複製網址！發給隊友即可直接同步開啟排班表。');
+            } catch (e) {
+                console.error(e);
+                showToast('產生分享連結失敗', 'error');
+            }
+        }
+
+        // 檢查網址是否有隊友分享的資料
+        function checkUrlShareData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataParam = urlParams.get('data');
+            if (!dataParam) return;
+
+            try {
+                let base64 = dataParam.replace(/-/g, '+').replace(/_/g, '/');
+                while (base64.length % 4) {
+                    base64 += '=';
+                }
+                const jsonString = decodeURIComponent(atob(base64));
+                const payload = JSON.parse(jsonString);
+
+                if (payload && payload.v === 2 && payload.grail && payload.radiant) {
+                    showCustomModal({
+                        title: '📥 檢測到分享的戰術排班資料',
+                        body: '您開啟的連結包含了隊友分享的完整排班表，請問是否要<b>載入並覆蓋</b>您目前的本機資料？',
+                        confirmText: '載入分享資料',
+                        cancelText: '忽略',
+                        onConfirm: () => {
+                            grailStore = payload.grail;
+                            radiantStore = payload.radiant;
+                            saveStore('grail');
+                            saveStore('radiant');
+
+                            if (payload.tab) switchTab(payload.tab);
+                            renderTeamOptions('grail');
+                            renderGrailInputs();
+                            renderGrailVisual();
+                            renderTeamOptions('radiant');
+                            renderRadiantInputs();
+                            renderRadiantVisual();
+
+                            // 清理網址中的參數，保持網址整潔
+                            history.replaceState({}, document.title, window.location.pathname);
+                            showToast('已成功載入隊友分享的排班資料！');
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("解析分享網址失敗", e);
+                showToast('❌ 分享連結格式不正確或已毀損', 'error');
+            }
+        }
+
+        // 初始化載入
         window.addEventListener('DOMContentLoaded', () => {
-            renderGrailTeamSelect();
+            renderTeamOptions('grail');
             renderGrailInputs();
             renderGrailVisual();
 
-            renderRadiantTeamSelect();
+            renderTeamOptions('radiant');
             renderRadiantInputs();
             renderRadiantVisual();
+
+            // 檢查是否有分享連結參數
+            checkUrlShareData();
         });
     </script>
 </body>
