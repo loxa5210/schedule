@@ -49,6 +49,9 @@
     <!-- Toast 通知容器 -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
+    <!-- 隱藏的 JSON 檔案選擇器 -->
+    <input type="file" id="json-file-input" accept=".json" class="hidden" onchange="handleImportJSON(event)">
+
     <!-- 通用彈窗 Modal -->
     <div id="modal-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all scale-95 opacity-0 duration-200" id="modal-card">
@@ -71,7 +74,7 @@
             聖域：穆斯費爾戰術排班系統
         </h1>
         <p class="text-xs md:text-sm text-slate-400 mt-1 mb-4">
-            支援「聖杯 10 人」與「8 人放射線」多組別管理，可產生連結一鍵分享給隊友！
+            支援「聖杯 10 人」與「8 人放射線」多組別管理，可產生連結一鍵分享或匯出/匯入 JSON 備份！
         </p>
 
         <!-- 頁籤切換按鈕 -->
@@ -118,7 +121,7 @@
 
             <div id="inputs-container-grail" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
 
-            <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
                 <button onclick="randomizeGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     隨機分組
@@ -133,7 +136,15 @@
                 </button>
                 <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-red-900/40">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                    🔗 產生分享連結
+                    🔗 分享連結
+                </button>
+                <button onclick="exportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    📤 匯出 JSON
+                </button>
+                <button onclick="triggerImportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"></path></svg>
+                    📥 匯入 JSON
                 </button>
             </div>
         </section>
@@ -203,7 +214,7 @@
 
             <div id="inputs-container-radiant" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
 
-            <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
                 <button onclick="randomizeRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     隨機分組
@@ -218,7 +229,15 @@
                 </button>
                 <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-sky-900/40">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                    🔗 產生分享連結
+                    🔗 分享連結
+                </button>
+                <button onclick="exportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    📤 匯出 JSON
+                </button>
+                <button onclick="triggerImportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"></path></svg>
+                    📥 匯入 JSON
                 </button>
             </div>
         </section>
@@ -377,7 +396,7 @@
             { id: 'r8', label: '8 號放射線', defaultName: "8號隊員", angle: 315, type: 'rad' },
         ];
 
-        // 預設預設組別結構
+        // 預設組別結構
         function createDefaultStore(mode) {
             const slots = mode === 'grail' ? slotConfigsGrail : slotConfigsRadiant;
             const initSlots = {};
@@ -839,6 +858,84 @@
                 console.error("解析分享網址失敗", e);
                 showToast('❌ 分享連結格式不正確或已毀損', 'error');
             }
+        }
+
+        // --- 📤 匯出 JSON 功能 ---
+        function exportJSON() {
+            try {
+                const payload = {
+                    v: 2,
+                    tab: currentTab,
+                    grail: grailStore,
+                    radiant: radiantStore
+                };
+                const jsonStr = JSON.stringify(payload, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const dateStr = new Date().toISOString().slice(0, 10);
+                a.href = url;
+                a.download = `AION2_tactics_backup_${dateStr}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('📤 已成功下載戰術排班 JSON 備份檔！');
+            } catch (e) {
+                console.error(e);
+                showToast('❌ 匯出 JSON 失敗', 'error');
+            }
+        }
+
+        // --- 📥 匯入 JSON 功能 ---
+        function triggerImportJSON() {
+            const input = document.getElementById('json-file-input');
+            if (input) {
+                input.value = '';
+                input.click();
+            }
+        }
+
+        function handleImportJSON(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const payload = JSON.parse(e.target.result);
+                    if (!payload || !payload.grail || !payload.radiant) {
+                        throw new Error('格式不符合規範');
+                    }
+
+                    showCustomModal({
+                        title: '📥 匯入 JSON 資料確認',
+                        body: '確定要載入此 JSON 檔案嗎？這將會<b>覆蓋</b>您目前的排班與組別資料。',
+                        confirmText: '確定覆蓋匯入',
+                        cancelText: '取消',
+                        onConfirm: () => {
+                            grailStore = payload.grail;
+                            radiantStore = payload.radiant;
+                            saveStore('grail');
+                            saveStore('radiant');
+
+                            if (payload.tab) switchTab(payload.tab);
+                            renderTeamOptions('grail');
+                            renderGrailInputs();
+                            renderGrailVisual();
+                            renderTeamOptions('radiant');
+                            renderRadiantInputs();
+                            renderRadiantVisual();
+
+                            showToast('🎉 JSON 排班資料匯入成功！');
+                        }
+                    });
+                } catch (err) {
+                    console.error(err);
+                    showToast('❌ 匯入失敗：JSON 檔案格式無效', 'error');
+                }
+            };
+            reader.readAsText(file);
         }
 
         // 初始化載入
