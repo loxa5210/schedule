@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AION2 聖域副本戰術排班系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0b0f19',
+                        cardbg: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .clip-triangle {
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-6 selection:bg-red-600 selection:text-white relative">
+
+    <!-- Toast 通知容器 -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- 隱藏的 JSON 檔案選擇器 -->
+    <input type="file" id="json-file-input" accept=".json" class="hidden" onchange="handleImportJSON(event)">
+
+    <!-- 通用彈窗 Modal -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all scale-95 opacity-0 duration-200" id="modal-card">
+            <h3 id="modal-title" class="text-lg font-bold text-slate-100 mb-2">提示</h3>
+            <p id="modal-body" class="text-xs md:text-sm text-slate-300 mb-4 leading-relaxed"></p>
+            <div id="modal-input-container" class="mb-4 hidden">
+                <input type="text" id="modal-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+            </div>
+            <div class="flex justify-end gap-3" id="modal-actions"></div>
+        </div>
+    </div>
+
+    <!-- 頂部標題與模式切換頁籤 -->
+    <header class="w-full max-w-5xl mx-auto text-center py-2 mb-2">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/80 border border-red-800 text-red-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+            AION2 副本戰術工具 (多組別 & 網址分享)
+        </div>
+        <h1 class="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-red-400 via-rose-300 to-amber-300 bg-clip-text text-transparent">
+            聖域：穆斯費爾戰術排班系統
+        </h1>
+        <p class="text-xs md:text-sm text-slate-400 mt-1 mb-4">
+            支援「聖杯 10 人」、「8 人放射線」與「一王踢球」多組別管理，可產生連結一鍵分享或匯出/匯入 JSON 備份！[cite: 2]
+        </p>
+
+        <!-- 頁籤切換按鈕 -->
+        <div class="flex flex-wrap justify-center gap-2">
+            <button id="tab-btn-grail" onclick="switchTab('grail')" class="px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 shadow-lg bg-red-600 text-white border border-red-500">
+                🏆 聖杯 10 人披薩排班
+            </button>
+            <button id="tab-btn-radiant" onclick="switchTab('radiant')" class="px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 shadow-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">
+                🧭 8 人放射線排班[cite: 2]
+            </button>
+            <button id="tab-btn-kick" onclick="switchTab('kick')" class="px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 shadow-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">
+                ⚽ 一王踢球機制排班[cite: 1]
+            </button>
+        </div>
+    </header>
+
+    <!-- 模式 1：聖杯 10 人披薩排班 -->
+    <main id="view-grail" class="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow">
+        <section class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl backdrop-blur-md">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    聖杯 10 人站位排班名單
+                </h2>
+                <span id="save-status-grail" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
+            </div>
+
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="flex-grow">
+                    <select id="team-select-grail" onchange="changeTeam('grail', this.value)" class="w-full bg-slate-950 border border-red-900/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-300 focus:outline-none focus:border-red-500">
+                    </select>
+                </div>
+                <button onclick="promptAddTeam('grail')" title="新增組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition flex items-center gap-1">➕ 新增</button>
+                <button onclick="promptRenameTeam('grail')" title="重命名目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition">✏️</button>
+                <button onclick="promptDeleteTeam('grail')" title="刪除目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-rose-950 text-rose-300 text-xs rounded-xl border border-slate-700 transition">🗑️</button>
+            </div>
+
+            <div id="inputs-container-grail" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
+                <button onclick="randomizeGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">隨機分組</button>
+                <button onclick="clearGrail()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">清空本組</button>
+                <button onclick="copyGrailText()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">複製純文字</button>
+                <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs font-bold rounded-xl shadow-lg">🔗 分享連結[cite: 2]</button>
+                <button onclick="exportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">📤 匯出 JSON[cite: 2]</button>
+                <button onclick="triggerImportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">📥 匯入 JSON[cite: 2]</button>
+            </div>
+        </section>
+
+        <section class="lg:col-span-7 flex flex-col items-center justify-center bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden min-h-[460px]">
+            <div class="absolute inset-0 bg-radial from-red-950/30 via-transparent to-transparent pointer-events-none"></div>
+            <div class="relative w-[360px] h-[360px] md:w-[400px] md:h-[400px] rounded-full flex items-center justify-center shadow-2xl border-4 border-red-950/80 bg-slate-950">
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 400">
+                    <defs>
+                        <radialGradient id="pizzaGlow" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#7f1d1d" />
+                            <stop offset="100%" stop-color="#450a0a" />
+                        </radialGradient>
+                    </defs>
+                    <circle cx="200" cy="200" r="190" fill="url(#pizzaGlow)" stroke="#991b1b" stroke-width="3" />
+                    <line x1="200" y1="200" x2="200" y2="10" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="200" y2="390" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="10" y2="200" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="390" y2="200" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="334" y2="66" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="66" y2="334" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="66" y2="66" stroke="#5c1313" stroke-width="2" />
+                    <line x1="200" y1="200" x2="334" y2="334" stroke="#5c1313" stroke-width="2" />
+                </svg>
+                <div class="absolute w-24 h-24 rounded-full bg-gradient-to-br from-red-700 to-red-950 border-2 border-red-600/60 shadow-xl flex flex-col items-center justify-center z-10 pointer-events-none">
+                    <span class="text-xs font-bold text-red-200 tracking-wider">BOSS</span>
+                    <span class="text-[10px] text-red-400 font-medium">聖杯核心</span>
+                </div>
+                <div id="pizza-slots-container" class="absolute inset-0 pointer-events-none"></div>
+            </div>
+            <div class="mt-3 flex items-center justify-center gap-6 text-xs text-slate-400">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span> ★ 星星位：左側水平位</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-sky-400 inline-block"></span> 🌙 月亮位：右側水平位</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- 模式 2：8人放射線藍三角機制排班 -->
+    <main id="view-radiant" class="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow hidden">
+        <section class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl backdrop-blur-md">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                    8人放射線/藍三角機制排班[cite: 2]
+                </h2>
+                <span id="save-status-radiant" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
+            </div>
+
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="flex-grow">
+                    <select id="team-select-radiant" onchange="changeTeam('radiant', this.value)" class="w-full bg-slate-950 border border-sky-900/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-sky-300 focus:outline-none focus:border-sky-500">
+                    </select>
+                </div>
+                <button onclick="promptAddTeam('radiant')" title="新增組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition flex items-center gap-1">➕ 新增</button>
+                <button onclick="promptRenameTeam('radiant')" title="重命名目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700 transition">✏️</button>
+                <button onclick="promptDeleteTeam('radiant')" title="刪除目前組別" class="px-2 py-1.5 bg-slate-800 hover:bg-rose-950 text-rose-300 text-xs rounded-xl border border-slate-700 transition">🗑️</button>
+            </div>
+
+            <div id="inputs-container-radiant" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
+                <button onclick="randomizeRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">隨機分組</button>
+                <button onclick="clearRadiant()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">清空本組</button>
+                <button onclick="copyRadiantText()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">複製純文字</button>
+                <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-sky-600 to-blue-600 text-white text-xs font-bold rounded-xl shadow-lg">🔗 分享連結[cite: 2]</button>
+                <button onclick="exportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">📤 匯出 JSON[cite: 2]</button>
+                <button onclick="triggerImportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5">📥 匯入 JSON[cite: 2]</button>
+            </div>
+        </section>
+
+        <section class="lg:col-span-7 flex flex-col items-center justify-center bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden min-h-[460px]">
+            <div class="absolute inset-0 bg-radial from-sky-950/25 via-transparent to-transparent pointer-events-none"></div>
+            <div class="relative w-[360px] h-[360px] md:w-[400px] md:h-[400px] rounded-full flex items-center justify-center shadow-2xl border-4 border-slate-800 bg-slate-950">
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 400">
+                    <line x1="200" y1="200" x2="200" y2="15" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="200" y2="385" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="15" y2="200" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="385" y2="200" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="331" y2="69" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="69" y2="331" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="69" y2="69" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                    <line x1="200" y1="200" x2="331" y2="331" stroke="#3b82f6" stroke-width="1.5" opacity="0.6" />
+                </svg>
+                <div class="absolute w-24 h-24 rounded-full bg-gradient-to-br from-red-600 to-red-950 border-2 border-red-500 shadow-xl flex flex-col items-center justify-center z-10 pointer-events-none">
+                    <span class="text-xs font-bold text-red-100 tracking-wider">BOSS</span>
+                    <span class="text-[9px] text-red-300 font-medium">核心區</span>
+                </div>
+                <div id="radiant-slots-container" class="absolute inset-0 pointer-events-none"></div>
+            </div>
+            <div class="mt-3 text-xs text-slate-400 text-center">
+                包含 1~8 放射線外圈編號（對應 12 點、1 點、3 點...時鐘方位）、8個藍三角裝飾位！[cite: 2]
+            </div>
+        </section>
+    </main>
+
+    <!-- 模式 3：一王踢球機制排班 (新增，附帶紅綠箭頭) -->
+    <main id="view-kick" class="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-grow hidden">
+        <section class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-5 shadow-2xl backdrop-blur-md">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">⚽ 一王踢球機制排班 (1, 3, 6, 9)[cite: 1]</h2>
+                <span id="save-status-kick" class="text-xs text-emerald-400 font-medium opacity-0 transition-opacity duration-300">已自動儲存</span>
+            </div>
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="flex-grow">
+                    <select id="team-select-kick" onchange="changeTeam('kick', this.value)" class="w-full bg-slate-950 border border-emerald-900/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-emerald-300 focus:outline-none focus:border-emerald-500"></select>
+                </div>
+                <button onclick="promptAddTeam('kick')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700">➕ 新增</button>
+                <button onclick="promptRenameTeam('kick')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-xl border border-slate-700">✏️</button>
+                <button onclick="promptDeleteTeam('kick')" class="px-2 py-1.5 bg-slate-800 hover:bg-rose-950 text-rose-300 text-xs rounded-xl border border-slate-700">🗑️</button>
+            </div>
+            <div id="inputs-container-kick" class="space-y-2 max-h-[360px] overflow-y-auto pr-1"></div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800">
+                <button onclick="randomizeKick()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700">隨機分組</button>
+                <button onclick="clearKick()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700">清空本組</button>
+                <button onclick="copyKickText()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700">複製純文字</button>
+                <button onclick="generateShareLink()" class="px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-lg">🔗 分享連結[cite: 2]</button>
+                <button onclick="exportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700">📤 匯出 JSON[cite: 2]</button>
+                <button onclick="triggerImportJSON()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700">📥 匯入 JSON[cite: 2]</button>
+            </div>
+        </section>
+        <section class="lg:col-span-7 flex flex-col items-center justify-center bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden min-h-[460px]">
+            <div class="relative w-[360px] h-[360px] md:w-[400px] md:h-[400px] rounded-full flex items-center justify-center shadow-2xl border-4 border-emerald-950 bg-slate-950">
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 400">
+                    <defs>
+                        <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                            <path d="M0,0 L8,3 L0,6 Z" fill="#ef4444" />
+                        </marker>
+                        <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                            <path d="M0,0 L8,3 L0,6 Z" fill="#22c55e" />
+                        </marker>
+                    </defs>
+                    <circle cx="200" cy="200" r="190" fill="#022c22" stroke="#047857" stroke-width="2" opacity="0.4" />
+                    
+                    <!-- 紅綠踢球路徑箭頭 -->
+                    <path d="M 180 200 L 140 200 L 170 100 L 225 65" fill="none" stroke="#ef4444" stroke-width="3" stroke-dasharray="4" marker-end="url(#arrowRed)" />
+                    <path d="M 220 200 L 270 240 L 320 220" fill="none" stroke="#ef4444" stroke-width="3" stroke-dasharray="4" marker-end="url(#arrowRed)" />
+                    <path d="M 200 175 L 140 145 L 105 190" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="4" marker-end="url(#arrowGreen)" />
+                    <path d="M 200 225 L 170 280 L 220 310" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="4" marker-end="url(#arrowGreen)" />
+                </svg>
+                <div class="absolute w-24 h-24 rounded-full bg-gradient-to-br from-red-600 to-red-950 border-2 border-red-500 shadow-xl flex flex-col items-center justify-center z-10 pointer-events-none">
+                    <span class="text-xs font-bold text-red-100">一王 (BOSS)[cite: 1]</span>
+                </div>
+                <div id="kick-slots-container" class="absolute inset-0 pointer-events-none"></div>
+            </div>
+            <div class="mt-3 text-xs text-slate-400 text-center">
+                包含 1, 3, 6, 9 踢球位與對應的紅綠轉折箭頭路徑[cite: 1]！
+            </div>
+        </section>
+    </main>
+
+    <footer class="w-full max-w-5xl mx-auto text-center py-4 mt-2 text-xs text-slate-500 border-t border-slate-900">
+        AION2 Sanctuary Strategy Tool &copy; 2026. All rights reserved.[cite: 2]
+    </footer>
+
+    <script>
+        // --- 通用 UI 元件 ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-950/90 border-emerald-700 text-emerald-200' : 'bg-rose-950/90 border-rose-700 text-rose-200';
+            toast.className = `px-4 py-2.5 rounded-xl border shadow-xl text-xs font-semibold backdrop-blur-md transition-all transform translate-y-2 opacity-0 flex items-center gap-2 ${bgClass}`;
+            toast.innerHTML = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-8px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function showCustomModal({ title, body, hasInput = false, inputValue = '', onConfirm, confirmText = '確定', cancelText = '取消' }) {
+            const overlay = document.getElementById('modal-overlay');
+            const card = document.getElementById('modal-card');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerHTML = body;
+            const inputContainer = document.getElementById('modal-input-container');
+            const input = document.getElementById('modal-input');
+            const actions = document.getElementById('modal-actions');
+
+            if (hasInput) {
+                inputContainer.classList.remove('hidden');
+                input.value = inputValue;
+                setTimeout(() => input.focus(), 100);
+            } else {
+                inputContainer.classList.add('hidden');
+            }
+
+            actions.innerHTML = '';
+            if (cancelText) {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700';
+                cancelBtn.innerText = cancelText;
+                cancelBtn.onclick = closeModal;
+                actions.appendChild(cancelBtn);
+            }
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl shadow-lg';
+            confirmBtn.innerText = confirmText;
+            confirmBtn.onclick = () => {
+                const val = hasInput ? input.value : true;
+                if (onConfirm(val) !== false) closeModal();
+            };
+            actions.appendChild(confirmBtn);
+
+            overlay.classList.remove('hidden');
+            setTimeout(() => card.classList.remove('scale-95', 'opacity-0'), 10);
+        }
+
+        function closeModal() {
+            const card = document.getElementById('modal-card');
+            card.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => document.getElementById('modal-overlay').classList.add('hidden'), 200);
+        }
+
+        // --- 頁籤切換 ---
+        let currentTab = 'grail';
+        function switchTab(tab) {
+            currentTab = tab;
+            ['grail', 'radiant', 'kick'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).className = "px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 shadow-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700";
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            const activeColors = { grail: 'bg-red-600 text-white border-red-500', radiant: 'bg-sky-600 text-white border-sky-500', kick: 'bg-emerald-600 text-white border-emerald-500' };
+            document.getElementById(`tab-btn-${tab}`).className = `px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 shadow-lg ${activeColors[tab]}`;
+        }
+
+        // --- 資料設定檔 ---
+        const slotConfigsGrail = [
+            { id: '1', type: 'pizza', label: '1 號位', angle: 22.5, defaultName: "隊員 1" },
+            { id: '2', type: 'pizza', label: '2 號位', angle: 67.5, defaultName: "隊員 2" },
+            { id: '3', type: 'pizza', label: '3 號位', angle: 112.5, defaultName: "隊員 3" },
+            { id: '4', type: 'pizza', label: '4 號位', angle: 157.5, defaultName: "隊員 4" },
+            { id: '5', type: 'pizza', label: '5 號位', angle: 202.5, defaultName: "隊員 5" },
+            { id: '6', type: 'pizza', label: '6 號位', angle: 247.5, defaultName: "隊員 6" },
+            { id: '7', type: 'pizza', label: '7 號位', angle: 292.5, defaultName: "隊員 7" },
+            { id: '8', type: 'pizza', label: '8 號位', angle: 337.5, defaultName: "隊員 8" },
+            { id: 'star', type: 'special', label: '★ 星星位', angle: 270, defaultName: "星星位隊員" },
+            { id: 'moon', type: 'special', label: '🌙 月亮位', angle: 90, defaultName: "月亮位隊員" }
+        ];
+
+        const slotConfigsRadiant = [
+            { id: 'r1', label: '1 號放射線 (12點)', defaultName: "1號隊員", angle: 0, clock: '12點', type: 'rad' },
+            { id: 'r2', label: '2 號放射線 (1點)', defaultName: "2號隊員", angle: 45, clock: '1點', type: 'rad' },
+            { id: 'r3', label: '3 號放射線 (3點)', defaultName: "3號隊員", angle: 90, clock: '3點', type: 'rad' },
+            { id: 'r4', label: '4 號放射線 (4點)', defaultName: "4號隊員", angle: 135, clock: '4點', type: 'rad' },
+            { id: 'r5', label: '5 號放射線 (6點)', defaultName: "5號隊員", angle: 180, clock: '6點', type: 'rad' },
+            { id: 'r6', label: '6 號放射線 (7點)', defaultName: "6號隊員", angle: 225, clock: '7點', type: 'rad' },
+            { id: 'r7', label: '7 號放射線 (9點)', defaultName: "7號隊員", angle: 270, clock: '9點', type: 'rad' },
+            { id: 'r8', label: '8 號放射線 (10點)', defaultName: "8號隊員", angle: 315, clock: '10點', type: 'rad' },
+        ];
+
+        const slotConfigsKick = [
+            { id: 'k1', label: '1 號踢球位 (正上)', defaultName: "1號踢球員", angle: 0 },
+            { id: 'k3', label: '3 號踢球位 (正右)', defaultName: "3號踢球員", angle: 90 },
+            { id: 'k6', label: '6 號踢球位 (正下)', defaultName: "6號踢球員", angle: 180 },
+            { id: 'k9', label: '9 號踢球位 (正左)', defaultName: "9號踢球員", angle: 270 },
+        ];
+
+        function createDefaultStore(mode) {
+            let slots = slotConfigsGrail;
+            if (mode === 'radiant') slots = slotConfigsRadiant;
+            if (mode === 'kick') slots = slotConfigsKick;
+            const initSlots = {};
+            slots.forEach(s => initSlots[s.id] = s.defaultName);
+            return {
+                activeTeamId: 't_1',
+                teams: [
+                    { id: 't_1', name: '團隊一 (主力隊)', slots: { ...initSlots } },
+                    { id: 't_2', name: '團隊二 (二分隊)', slots: { ...initSlots } }
+                ]
+            };
+        }
+
+        function loadStore(mode) {
+            const key = `aion2_${mode}_teams_v5`;
+            const saved = localStorage.getItem(key);
+            if (saved) { try { return JSON.parse(saved); } catch(e){} }
+            return createDefaultStore(mode);
+        }
+
+        function saveStore(mode) {
+            const key = `aion2_${mode}_teams_v5`;
+            const data = mode === 'grail' ? grailStore : (mode === 'radiant' ? radiantStore : kickStore);
+            localStorage.setItem(key, JSON.stringify(data));
+            const ind = document.getElementById(`save-status-${mode}`);
+            if (ind) {
+                ind.style.opacity = '1';
+                setTimeout(() => ind.style.opacity = '0', 1000);
+            }
+        }
+
+        let grailStore = loadStore('grail');
+        let radiantStore = loadStore('radiant');
+        let kickStore = loadStore('kick');
+
+        function getActiveTeam(mode) {
+            const store = mode === 'grail' ? grailStore : (mode === 'radiant' ? radiantStore : kickStore);
+            let team = store.teams.find(t => t.id === store.activeTeamId);
+            if (!team && store.teams.length > 0) { team = store.teams[0]; store.activeTeamId = team.id; }
+            return team;
+        }
+
+        function renderTeamOptions(mode) {
+            const store = mode === 'grail' ? grailStore : (mode === 'radiant' ? radiantStore : kickStore);
+            const select = document.getElementById(`team-select-${mode}`);
+            select.innerHTML = '';
+            store.teams.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.innerText = t.name;
+                if (t.id === store.activeTeamId) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        function changeTeam(mode, teamId) {
+            const store = mode === 'grail' ? grailStore : (mode === 'radiant' ? radiantStore : kickStore);
+            store.activeTeamId = teamId;
+            saveStore(mode);
+            renderAllForMode(mode);
+        }
+
+        function renderAllForMode(mode) {
+            if (mode === 'grail') { renderGrailInputs(); renderGrailVisual(); }
+            else if (mode === 'radiant') { renderRadiantInputs(); renderRadiantVisual(); }
+            else if (mode === 'kick') { renderKickInputs(); renderKickVisual(); }
+        }
+
+        function promptAddTeam(mode) {
+            showCustomModal({
+                title: '新增組別', body: '請輸入新組別名稱：', hasInput: true, inputValue: `新團隊 ${Date.now().toString().slice(-3)}`,
+                onConfirm: (name) => {
+                    if (!name.trim()) return false;
+                    const store = mode === 'grail' ? grailStore : (mode === 'radiant' ? radiantStore : kickStore);
+                    const cfg = mode === 'grail' ? slotConfigsGrail : (mode === 'radiant' ? slotConfigsRadiant : slotConfigsKick);
+                    const initSlots = {};
+                    cfg.forEach(s => initSlots[s.id] = s.defaultName);
+                    const newTeam = { id: 't_' + Date.now(), name: name.trim(), slots: initSlots };
+                    store.teams.push(newTeam);
+                    store.activeTeamId = newTeam.id;
+                    saveStore(mode);
+                    renderTeamOptions(mode);
+                    renderAllForMode(mode);
+                    showToast(`已新增組別：「${newTeam.name}」`);
+                }
+            });
+        }
+
+        function promptRenameTeam(mode) {
+            const team = getActiveTeam(mode);
+            showCustomModal({
+                title: '重命名組別', body: '請輸入新的組別名稱：', hasInput: true, inputValue: team.name,
+                onConfirm: (newName) => {
+                    if (!newName.trim()) return false;
+                    team.name = newName.trim();
+                    saveStore(mode);
+                    renderTeamOptions(mode);
+                    showToast(`已更新名稱為：「${team.name}」`);
+                }
+            });
+        }
+
+        function promptDeleteTeam(mode) {
+            const store = mode === 'grail' ? grailStore : (mode === 'radiant' ? radiantStore : kickStore);
+            if (store.teams.length <= 1) { showCustomModal({ title: '無法刪除', body: '至少必須保留一個團隊組別！', cancelText: '' }); return; }
+            const team = getActiveTeam(mode);
+            showCustomModal({
+                title: '刪除組別確認', body: `確定要刪除「<b>${team.name}</b>」嗎？`,
+                onConfirm: () => {
+                    store.teams = store.teams.filter(t => t.id !== team.id);
+                    store.activeTeamId = store.teams[0].id;
+                    saveStore(mode);
+                    renderTeamOptions(mode);
+                    renderAllForMode(mode);
+                    showToast('已成功刪除組別！');
+                }
+            });
+        }
+
+        // --- 渲染 聖杯 ---
+        function renderGrailInputs() {
+            const container = document.getElementById('inputs-container-grail');
+            container.innerHTML = '';
+            const team = getActiveTeam('grail');
+            slotConfigsGrail.forEach(cfg => {
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-3 p-2 rounded-xl border bg-slate-950/60 border-slate-800";
+                div.innerHTML = `<div class="w-7 h-7 rounded-lg bg-red-950/80 border border-red-800 flex items-center justify-center text-red-300 font-bold text-xs shrink-0">${cfg.id}</div>
+                <div class="flex-grow"><div class="text-[10px] text-slate-400 mb-0.5">${cfg.label}</div>
+                <input type="text" value="${team.slots[cfg.id] || ''}" data-id="${cfg.id}" class="grail-input w-full bg-slate-900 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs text-slate-100 focus:outline-none focus:border-red-500"></div>`;
+                container.appendChild(div);
+            });
+            document.querySelectorAll('.grail-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    team.slots[e.target.getAttribute('data-id')] = e.target.value;
+                    saveStore('grail');
+                    renderGrailVisual();
+                });
+            });
+        }
+        function renderGrailVisual() {
+            const container = document.getElementById('pizza-slots-container');
+            container.innerHTML = '';
+            const team = getActiveTeam('grail');
+            slotConfigsGrail.forEach(cfg => {
+                const radius = cfg.type === 'special' ? 84 : 122;
+                const rad = (cfg.angle - 90) * (Math.PI / 180);
+                const x = 200 + radius * Math.cos(rad), y = 200 + radius * Math.sin(rad);
+                const badge = document.createElement('div');
+                badge.className = "absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 z-20";
+                badge.style.left = `${(x/400)*100}%`; badge.style.top = `${(y/400)*100}%`;
+                badge.innerHTML = `<div class="px-2 py-1 bg-slate-900/95 border border-red-500/40 rounded-lg shadow-lg text-center min-w-[50px]"><div class="text-[9px] font-bold text-red-400">#${cfg.id}</div><div class="text-[11px] font-semibold text-slate-100 truncate max-w-[70px]">${team.slots[cfg.id] || '未填'}</div></div>`;
+                container.appendChild(badge);
+            });
+        }
+        function randomizeGrail() { doRandomize('grail', slotConfigsGrail); }
+        function clearGrail() { doClear('grail', slotConfigsGrail); }
+        function copyGrailText() { doCopy('grail', slotConfigsGrail, '聖杯排班表'); }
+
+        // --- 渲染 8人放射線 ---
+        function renderRadiantInputs() {
+            const container = document.getElementById('inputs-container-radiant');
+            container.innerHTML = '';
+            const team = getActiveTeam('radiant');
+            slotConfigsRadiant.forEach(cfg => {
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-3 p-2 rounded-xl border bg-slate-950/60 border-slate-800";
+                div.innerHTML = `<div class="w-7 h-7 rounded-lg bg-sky-950/80 border border-sky-800 flex items-center justify-center text-sky-300 font-bold text-xs shrink-0">${cfg.id.replace('r','')}</div>
+                <div class="flex-grow"><div class="text-[10px] text-slate-400 mb-0.5 flex justify-between"><span>${cfg.label}</span><span class="text-sky-400 font-bold">🕒 ${cfg.clock}</span></div>
+                <input type="text" value="${team.slots[cfg.id] || ''}" data-id="${cfg.id}" class="radiant-input w-full bg-slate-900 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs text-slate-100 focus:outline-none focus:border-sky-500"></div>`;
+                container.appendChild(div);
+            });
+            document.querySelectorAll('.radiant-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    team.slots[e.target.getAttribute('data-id')] = e.target.value;
+                    saveStore('radiant');
+                    renderRadiantVisual();
+                });
+            });
+        }
+        function renderRadiantVisual() {
+            const container = document.getElementById('radiant-slots-container');
+            container.innerHTML = '';
+            const team = getActiveTeam('radiant');
+            slotConfigsRadiant.forEach(cfg => {
+                const radius = 135;
+                const rad = (cfg.angle - 90) * (Math.PI / 180);
+                const x = 200 + radius * Math.cos(rad), y = 200 + radius * Math.sin(rad);
+                const badge = document.createElement('div');
+                badge.className = "absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 z-20";
+                badge.style.left = `${(x/400)*100}%`; badge.style.top = `${(y/400)*100}%`;
+                badge.innerHTML = `<div class="px-2 py-1 bg-slate-900/95 border border-sky-500/50 rounded-lg shadow-lg text-center min-w-[65px]"><div class="text-[9px] font-bold text-sky-400">#${cfg.id.replace('r','')} <span class="text-amber-300">(${cfg.clock})</span></div><div class="text-[11px] font-semibold text-slate-100 truncate max-w-[85px]">${team.slots[cfg.id] || '未填'}</div></div>`;
+                container.appendChild(badge);
+
+                // 藍色三角形點位
+                const triRadius = 75;
+                const triX = 200 + triRadius * Math.cos(rad), triY = 200 + triRadius * Math.sin(rad);
+                const triBadge = document.createElement('div');
+                triBadge.className = "absolute pointer-events-none transform -translate-x-1/2 -translate-y-1/2 z-10";
+                triBadge.style.left = `${(triX/400)*100}%`; triBadge.style.top = `${(triY/400)*100}%`;
+                triBadge.innerHTML = `<div class="w-3 h-3 bg-blue-500 clip-triangle shadow-md opacity-80"></div>`;
+                container.appendChild(triBadge);
+            });
+        }
+        function randomizeRadiant() { doRandomize('radiant', slotConfigsRadiant); }
+        function clearRadiant() { doClear('radiant', slotConfigsRadiant); }
+        function copyRadiantText() { doCopy('radiant', slotConfigsRadiant, '8人放射線排班表'); }
+
+        // --- 渲染 一王踢球 (1, 3, 6, 9) ---
+        function renderKickInputs() {
+            const container = document.getElementById('inputs-container-kick');
+            container.innerHTML = '';
+            const team = getActiveTeam('kick');
+            slotConfigsKick.forEach(cfg => {
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-3 p-2 rounded-xl border bg-slate-950/60 border-slate-800";
+                const num = cfg.id.replace('k','');
+                div.innerHTML = `<div class="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-600 flex items-center justify-center text-emerald-300 font-bold text-xs shrink-0">${num}</div>
+                <div class="flex-grow"><div class="text-[10px] text-slate-400 mb-0.5">${cfg.label}</div>
+                <input type="text" value="${team.slots[cfg.id] || ''}" data-id="${cfg.id}" class="kick-input w-full bg-slate-900 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"></div>`;
+                container.appendChild(div);
+            });
+            document.querySelectorAll('.kick-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    team.slots[e.target.getAttribute('data-id')] = e.target.value;
+                    saveStore('kick');
+                    renderKickVisual();
+                });
+            });
+        }
+        function renderKickVisual() {
+            const container = document.getElementById('kick-slots-container');
+            container.innerHTML = '';
+            const team = getActiveTeam('kick');
+            slotConfigsKick.forEach(cfg => {
+                const radius = 135;
+                const rad = (cfg.angle - 90) * (Math.PI / 180);
+                const x = 200 + radius * Math.cos(rad), y = 200 + radius * Math.sin(rad);
+                const badge = document.createElement('div');
+                badge.className = "absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 z-20";
+                badge.style.left = `${(x/400)*100}%`; badge.style.top = `${(y/400)*100}%`;
+                const num = cfg.id.replace('k','');
+                badge.innerHTML = `<div class="px-2 py-1.5 bg-slate-900/95 border-2 border-emerald-500 rounded-xl shadow-xl text-center min-w-[70px]">
+                    <div class="text-[10px] font-bold text-emerald-400">⚽ ${num} 號位</div>
+                    <div class="text-[11px] font-bold text-slate-100 truncate max-w-[90px]">${team.slots[cfg.id] || '未填'}</div>
+                </div>`;
+                container.appendChild(badge);
+            });
+        }
+        function randomizeKick() { doRandomize('kick', slotConfigsKick); }
+        function clearKick() { doClear('kick', slotConfigsKick); }
+        function copyKickText() { doCopy('kick', slotConfigsKick, '一王踢球機制排班表'); }
+
+        // 共用輔助函式
+        function doRandomize(mode, configs) {
+            const team = getActiveTeam(mode);
+            let list = configs.map(s => team.slots[s.id] && team.slots[s.id].trim() !== '' ? team.slots[s.id].trim() : s.defaultName);
+            for (let i = list.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [list[i], list[j]] = [list[j], list[i]];
+            }
+            configs.forEach((s, idx) => team.slots[s.id] = list[idx]);
+            saveStore(mode);
+            renderAllForMode(mode);
+            showToast('已完成隨機分組！');
+        }
+        function doClear(mode, configs) {
+            showCustomModal({
+                title: '清空本組名單', body: '確定要清空目前組別的所有內容嗎？',
+                onConfirm: () => {
+                    const team = getActiveTeam(mode);
+                    configs.forEach(s => team.slots[s.id] = '');
+                    saveStore(mode);
+                    renderAllForMode(mode);
+                    showToast('已清空名單');
+                }
+            });
+        }
+        function doCopy(mode, configs, titleName) {
+            const team = getActiveTeam(mode);
+            let text = `【 AION2 聖域 - ${team.name} ${titleName} 】\n`;
+            configs.forEach(s => text += `${s.label}：${team.slots[s.id] || '(空白)'}\n`);
+            copyToClipboard(text);
+            showToast('已成功複製純文字排班表！');
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        function generateShareLink() {
+            try {
+                const payload = { v: 5, tab: currentTab, grail: grailStore, radiant: radiantStore, kick: kickStore };
+                const encoded = btoa(encodeURIComponent(JSON.stringify(payload))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                copyToClipboard(`${window.location.origin}${window.location.pathname}?data=${encoded}`);
+                showToast('🔗 已成功複製網址！發給隊友即可直接同步[cite: 2]。');
+            } catch (e) { showToast('產生分享連結失敗', 'error'); }
+        }
+
+        function checkUrlShareData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataParam = urlParams.get('data');
+            if (!dataParam) return;
+            try {
+                let base64 = dataParam.replace(/-/g, '+').replace(/_/g, '/');
+                while (base64.length % 4) base64 += '=';
+                const payload = JSON.parse(decodeURIComponent(atob(base64)));
+                if (payload && payload.grail && payload.radiant && payload.kick) {
+                    showCustomModal({
+                        title: '📥 檢測到分享資料', body: '是否要<b>載入並覆蓋</b>您目前的本機資料？',
+                        confirmText: '載入分享資料', cancelText: '忽略',
+                        onConfirm: () => {
+                            grailStore = payload.grail; radiantStore = payload.radiant; kickStore = payload.kick;
+                            saveStore('grail'); saveStore('radiant'); saveStore('kick');
+                            if (payload.tab) switchTab(payload.tab);
+                            ['grail', 'radiant', 'kick'].forEach(m => { renderTeamOptions(m); renderAllForMode(m); });
+                            history.replaceState({}, document.title, window.location.pathname);
+                            showToast('已成功載入隊友分享資料！');
+                        }
+                    });
+                }
+            } catch (e) { showToast('❌ 分享連結格式不正確', 'error'); }
+        }
+
+        function exportJSON() {
+            const payload = { v: 5, tab: currentTab, grail: grailStore, radiant: radiantStore, kick: kickStore };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `AION2_tactics_backup_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            showToast('📤 已成功下載備份檔[cite: 2]！');
+        }
+
+        function triggerImportJSON() { document.getElementById('json-file-input').click(); }
+        function handleImportJSON(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const payload = JSON.parse(e.target.result);
+                    if (!payload.grail || !payload.radiant || !payload.kick) throw new Error();
+                    showCustomModal({
+                        title: '📥 匯入確認', body: '確定要載入此檔案嗎？這將會<b>覆蓋</b>您目前的資料。',
+                        confirmText: '確定覆蓋', cancelText: '取消',
+                        onConfirm: () => {
+                            grailStore = payload.grail; radiantStore = payload.radiant; kickStore = payload.kick;
+                            ['grail', 'radiant', 'kick'].forEach(m => { saveStore(m); renderTeamOptions(m); renderAllForMode(m); });
+                            if (payload.tab) switchTab(payload.tab);
+                            showToast('🎉 資料匯入成功！');
+                        }
+                    });
+                } catch (err) { showToast('❌ 格式無效', 'error'); }
+            };
+            reader.readAsText(file);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            ['grail', 'radiant', 'kick'].forEach(m => { renderTeamOptions(m); renderAllForMode(m); });
+            checkUrlShareData();
+        });
+    </script>
+</body>
+</html>
