@@ -265,7 +265,7 @@
                 <div id="radiant-slots-container" class="absolute inset-0 pointer-events-none"></div>
             </div>
             <div class="mt-3 text-xs text-slate-400 text-center">
-                包含 1~8 放射線外圈編號、8個藍三角裝飾位以及下方弧形坦位！
+                包含 1~8 放射線外圈編號（對應 12 點、1.5 點、3 點...時鐘方位）、8個藍三角裝飾位！
             </div>
         </section>
     </main>
@@ -385,15 +385,16 @@
             { id: 'moon', type: 'special', label: '🌙 月亮位', angle: 90,  defaultName: "月亮位隊員" }
         ];
 
+        // 8人放射線加入時鐘方位標註 (#1 = 12點, #5 = 6點)
         const slotConfigsRadiant = [
-            { id: 'r1', label: '1 號放射線', defaultName: "1號隊員", angle: 0, type: 'rad' },
-            { id: 'r2', label: '2 號放射線', defaultName: "2號隊員", angle: 45, type: 'rad' },
-            { id: 'r3', label: '3 號放射線', defaultName: "3號隊員", angle: 90, type: 'rad' },
-            { id: 'r4', label: '4 號放射線', defaultName: "4號隊員", angle: 135, type: 'rad' },
-            { id: 'r5', label: '5 號放射線', defaultName: "5號隊員", angle: 180, type: 'rad' },
-            { id: 'r6', label: '6 號放射線', defaultName: "6號隊員", angle: 225, type: 'rad' },
-            { id: 'r7', label: '7 號放射線', defaultName: "7號隊員", angle: 270, type: 'rad' },
-            { id: 'r8', label: '8 號放射線', defaultName: "8號隊員", angle: 315, type: 'rad' },
+            { id: 'r1', label: '1 號放射線 (12點)', defaultName: "1號隊員", angle: 0, clock: '12點', type: 'rad' },
+            { id: 'r2', label: '2 號放射線 (1點)', defaultName: "2號隊員", angle: 45, clock: '1點', type: 'rad' },
+            { id: 'r3', label: '3 號放射線 (3點)', defaultName: "3號隊員", angle: 90, clock: '3點', type: 'rad' },
+            { id: 'r4', label: '4 號放射線 (4點)', defaultName: "4號隊員", angle: 135, clock: '4點', type: 'rad' },
+            { id: 'r5', label: '5 號放射線 (6點)', defaultName: "5號隊員", angle: 180, clock: '6點', type: 'rad' },
+            { id: 'r6', label: '6 號放射線 (7點)', defaultName: "6號隊員", angle: 225, clock: '7點', type: 'rad' },
+            { id: 'r7', label: '7 號放射線 (9點)', defaultName: "7號隊員", angle: 270, clock: '9點', type: 'rad' },
+            { id: 'r8', label: '8 號放射線 (10點)', defaultName: "8號隊員", angle: 315, clock: '10點', type: 'rad' },
         ];
 
         // 預設組別結構
@@ -412,7 +413,7 @@
 
         // --- LocalStorage 讀取與儲存 ---
         function loadStore(mode) {
-            const key = mode === 'grail' ? 'aion2_grail_teams_v2' : 'aion2_radiant_teams_v2';
+            const key = mode === 'grail' ? 'aion2_grail_teams_v2' : 'aion2_radiant_teams_v3';
             const saved = localStorage.getItem(key);
             if (saved) {
                 try { return JSON.parse(saved); } catch(e){}
@@ -421,7 +422,7 @@
         }
 
         function saveStore(mode) {
-            const key = mode === 'grail' ? 'aion2_grail_teams_v2' : 'aion2_radiant_teams_v2';
+            const key = mode === 'grail' ? 'aion2_grail_teams_v2' : 'aion2_radiant_teams_v3';
             const data = mode === 'grail' ? grailStore : radiantStore;
             localStorage.setItem(key, JSON.stringify(data));
             const ind = document.getElementById(`save-status-${mode}`);
@@ -663,18 +664,18 @@
             slotConfigsRadiant.forEach(cfg => {
                 const name = team.slots[cfg.id] || '';
                 const div = document.createElement('div');
-                div.className = `flex items-center gap-3 p-2 rounded-xl border transition ${cfg.type === 'tank' ? 'bg-red-950/40 border-red-800/80' : 'bg-slate-950/60 border-slate-800/80'}`;
+                div.className = `flex items-center gap-3 p-2 rounded-xl border transition bg-slate-950/60 border-slate-800/80`;
 
                 let badge = `<div class="w-7 h-7 rounded-lg bg-sky-950/80 border border-sky-800 flex items-center justify-center text-sky-300 font-bold text-xs shrink-0">${cfg.id.replace('r','')}</div>`;
-                if (cfg.type === 'tank') {
-                    badge = `<div class="w-7 h-7 rounded-lg bg-red-900 border border-red-600 flex items-center justify-center text-white font-bold text-xs shrink-0">坦</div>`;
-                }
 
                 div.innerHTML = `
                     ${badge}
                     <div class="flex-grow">
-                        <div class="text-[10px] text-slate-400 mb-0.5 font-medium">${cfg.label}</div>
-                        <input type="text" value="${name}" data-id="${cfg.id}" placeholder="輸入 ${cfg.label}..." 
+                        <div class="text-[10px] text-slate-400 mb-0.5 font-medium flex items-center justify-between">
+                            <span>${cfg.label}</span>
+                            <span class="text-sky-400 font-bold">🕒 ${cfg.clock}</span>
+                        </div>
+                        <input type="text" value="${name}" data-id="${cfg.id}" placeholder="輸入隊員名稱..." 
                                class="radiant-input w-full bg-slate-900 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs md:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500">
                     </div>
                 `;
@@ -696,8 +697,8 @@
             container.innerHTML = '';
             const team = getActiveTeam('radiant');
 
-            // 渲染 8 個放射線位置
-            slotConfigsRadiant.filter(s => s.type === 'rad').forEach(cfg => {
+            // 渲染 8 個放射線位置 (包含時鐘標籤)
+            slotConfigsRadiant.forEach(cfg => {
                 const name = team.slots[cfg.id] || '';
                 const radius = 135;
                 const rad = (cfg.angle - 90) * (Math.PI / 180);
@@ -710,9 +711,12 @@
                 badge.style.top = `${(y/400)*100}%`;
 
                 badge.innerHTML = `
-                    <div class="px-2 py-1 bg-slate-900/95 border border-sky-500/50 rounded-lg shadow-lg text-center min-w-[55px]">
-                        <div class="text-[9px] font-bold text-sky-400">#${cfg.id.replace('r','')} 放射</div>
-                        <div class="text-[11px] font-semibold text-slate-100 truncate max-w-[75px]">${name || '未填'}</div>
+                    <div class="px-2 py-1 bg-slate-900/95 border border-sky-500/50 rounded-lg shadow-lg text-center min-w-[65px]">
+                        <div class="text-[9px] font-bold text-sky-400 flex items-center justify-center gap-1">
+                            <span>#${cfg.id.replace('r','')}</span>
+                            <span class="text-amber-300 font-extrabold">(${cfg.clock})</span>
+                        </div>
+                        <div class="text-[11px] font-semibold text-slate-100 truncate max-w-[85px]">${name || '未填'}</div>
                     </div>
                 `;
                 container.appendChild(badge);
@@ -728,19 +732,11 @@
                 triBadge.innerHTML = `<div class="w-3 h-3 bg-blue-500 clip-triangle shadow-md opacity-80"></div>`;
                 container.appendChild(triBadge);
             });
-
-            // 下方坦位弧形區
-            const tankName = team.slots['tank'] || '';
-            const tankBadge = document.createElement('div');
-            tankBadge.className = "absolute pointer-events-auto transform -translate-x-1/2 transition-all duration-200 z-20";
-            tankBadge.style.left = `50%`;
-            tankBadge.style.bottom = `18px`;
-            container.appendChild(tankBadge);
         }
 
         function randomizeRadiant() {
             const team = getActiveTeam('radiant');
-            let radSlots = slotConfigsRadiant.filter(s => s.type === 'rad');
+            let radSlots = slotConfigsRadiant;
             let list = radSlots.map(s => team.slots[s.id] && team.slots[s.id].trim() !== '' ? team.slots[s.id].trim() : s.defaultName);
             for (let i = list.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -770,7 +766,7 @@
 
         function copyRadiantText() {
             const team = getActiveTeam('radiant');
-            let text = `【 AION2 聖域 - ${team.name} 8人放射線排班表 】\n`;
+            let text = `【 AION2 聖域 - ${team.name} 8人放射線排班表 (時鐘方位) 】\n`;
             slotConfigsRadiant.forEach(s => text += `${s.label}：${team.slots[s.id] || '(空白)'}\n`);
             copyToClipboard(text);
             showToast('已成功複製 8 人放射線純文字排班表！');
@@ -793,13 +789,12 @@
         function generateShareLink() {
             try {
                 const payload = {
-                    v: 2,
+                    v: 3,
                     tab: currentTab,
                     grail: grailStore,
                     radiant: radiantStore
                 };
                 const jsonString = JSON.stringify(payload);
-                // URL-safe Base64 編碼，支援 UTF-8 中文字元
                 const encoded = btoa(encodeURIComponent(jsonString))
                     .replace(/\+/g, '-')
                     .replace(/\//g, '_')
@@ -828,7 +823,7 @@
                 const jsonString = decodeURIComponent(atob(base64));
                 const payload = JSON.parse(jsonString);
 
-                if (payload && payload.v === 2 && payload.grail && payload.radiant) {
+                if (payload && payload.grail && payload.radiant) {
                     showCustomModal({
                         title: '📥 檢測到分享的戰術排班資料',
                         body: '您開啟的連結包含了隊友分享的完整排班表，請問是否要<b>載入並覆蓋</b>您目前的本機資料？',
@@ -848,7 +843,6 @@
                             renderRadiantInputs();
                             renderRadiantVisual();
 
-                            // 清理網址中的參數，保持網址整潔
                             history.replaceState({}, document.title, window.location.pathname);
                             showToast('已成功載入隊友分享的排班資料！');
                         }
@@ -864,7 +858,7 @@
         function exportJSON() {
             try {
                 const payload = {
-                    v: 2,
+                    v: 3,
                     tab: currentTab,
                     grail: grailStore,
                     radiant: radiantStore
@@ -948,7 +942,6 @@
             renderRadiantInputs();
             renderRadiantVisual();
 
-            // 檢查是否有分享連結參數
             checkUrlShareData();
         });
     </script>
